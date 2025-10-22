@@ -58,6 +58,7 @@ private:
     
     // Inter-task communication
     QueueHandle_t file_io_queue;
+    QueueHandle_t network_publish_queue;
     
     // File I/O state
     bool filesystem_available;
@@ -86,7 +87,7 @@ public:
     ~FileIOTask();
     
     // Initialization
-    void init(QueueHandle_t io_queue);
+    void init(QueueHandle_t io_queue, QueueHandle_t network_queue = nullptr);
     
     // Task lifecycle
     bool start_task();

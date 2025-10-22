@@ -1,6 +1,6 @@
 ## Project Overview
 
-ESP32-S3 intelligent coffee scale with grind-by-weight functionality. Features predictive grinding system, LVGL touch UI, and BLE OTA updates. Automatically grinds coffee beans to precise target weights using flow prediction and pulse correction algorithms.
+ESP32-S3 intelligent coffee scale with grind-by-weight functionality. Features predictive grinding system, LVGL touch UI, BLE OTA updates, and WiFi/MQTT connectivity for cloud data logging. Automatically grinds coffee beans to precise target weights using flow prediction and pulse correction algorithms.
 
 ## Essential Commands
 
@@ -55,6 +55,18 @@ python3 tools/grinder.py analyze
 - **Return on Removal Toggle**: Leave the completion screen and reset to Ready once the cup is lifted after grinding
 - **Preferences**: `swipe.enabled` (boolean) and existing `grind_mode` (0=Weight, 1=Time)
 - **Behavior**: Swipe gestures only work when enabled; direct mode selection always works
+
+**WiFi/MQTT Integration:** Network connectivity for cloud data logging
+- **WiFiManager** (`src/network/wifi_manager.h`): WiFi connection management with auto-reconnect and exponential backoff
+- **MQTTManager** (`src/network/mqtt_manager.h`): MQTT client for publishing grind sessions to broker
+- **NetworkConfigService** (BLE): BLE service for provisioning WiFi credentials and MQTT broker settings
+- **NetworkTask**: Dedicated FreeRTOS task (Core 1, Priority 2, 500ms interval) for WiFi/MQTT operations
+- **Data Format**: JSON serialization of grind sessions (device_id, session_id, timestamp, duration, mode, target, final_weight, pulse_count, etc.)
+- **MQTT Topics**: `grinder/{device_id}/sessions/{session_id}` with retained messages
+- **Configuration**: Stored in NVS namespace `"network"` (wifi_ssid, wifi_password, mqtt_broker, mqtt_port, mqtt_username, mqtt_password)
+- **Provisioning**: Configure via BLE using `python3 tools/grinder.py wifi-config` and `python3 tools/grinder.py mqtt-config`
+- **Publishing**: Automatic batch upload after grind completion, queued via `network_publish_queue`
+- **Libraries**: PubSubClient (MQTT), ArduinoJson (JSON serialization)
 
 **Color Scheme (RGB565):**
 - `COLOR_PRIMARY`: 0xFF0000 (Red) - Primary theme color

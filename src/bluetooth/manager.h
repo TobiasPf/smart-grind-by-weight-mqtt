@@ -12,6 +12,7 @@
 #include "../config/constants.h"
 #include "ota_handler.h"
 #include "data_stream.h"
+#include "network_config_service.h"
 
 // Forward declaration to avoid circular dependency
 class UIManager;
@@ -60,6 +61,7 @@ private:
     BLEService* data_service;
     BLEService* debug_service;
     BLEService* sysinfo_service;
+    BLEService* network_service;
     
     // OTA characteristics
     BLECharacteristic* ota_data_characteristic;
@@ -82,6 +84,12 @@ private:
     BLECharacteristic* sysinfo_hardware_characteristic;
     BLECharacteristic* sysinfo_sessions_characteristic;
     BLECharacteristic* sysinfo_diagnostics_characteristic;
+
+    // Network config characteristics
+    BLECharacteristic* network_wifi_characteristic;
+    BLECharacteristic* network_mqtt_characteristic;
+    BLECharacteristic* network_status_characteristic;
+    BLECharacteristic* network_control_characteristic;
     
     // Connection state
     bool device_connected;
@@ -94,6 +102,11 @@ private:
     // Component handlers
     OTAHandler ota_handler;
     DataStreamManager data_stream;
+    NetworkConfigService network_config_service;
+
+    // Network manager references (set after init)
+    WiFiManager* wifi_manager;
+    MQTTManager* mqtt_manager;
     
     // Data export state
     bool data_export_in_progress;
@@ -132,6 +145,7 @@ private:
     void update_hardware_info();
     void update_sessions_info();
     void generate_diagnostic_report();
+    void handle_network_characteristic_write(BLECharacteristic* characteristic);
     
 public:
     BluetoothManager();
@@ -141,6 +155,13 @@ public:
      * Initialize Bluetooth manager
      */
     void init(Preferences* prefs);
+
+    /**
+     * Set network managers (call after WiFi/MQTT managers are created)
+     * @param wifi WiFiManager instance
+     * @param mqtt MQTTManager instance
+     */
+    void set_network_managers(WiFiManager* wifi, MQTTManager* mqtt);
     
     /**
      * Enable BLE and start advertising

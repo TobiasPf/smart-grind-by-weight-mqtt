@@ -9,6 +9,8 @@
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "bluetooth/manager.h"
+#include "network/wifi_manager.h"
+#include "network/mqtt_manager.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -21,6 +23,8 @@ GrindController grind_controller;
 UIManager ui_manager;
 BluetoothManager g_bluetooth_manager;
 BluetoothManager& bluetooth_manager = g_bluetooth_manager;
+WiFiManager wifi_manager;
+MQTTManager mqtt_manager;
 
 #if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
@@ -75,7 +79,14 @@ void setup() {
     hardware_manager.set_grind_controller(&grind_controller);
     
     bluetooth_manager.init(hardware_manager.get_preferences());
-    
+
+    // Initialize WiFi and MQTT managers
+    wifi_manager.init(hardware_manager.get_preferences());
+    mqtt_manager.init(hardware_manager.get_preferences());
+
+    // Link network managers to Bluetooth for BLE provisioning
+    bluetooth_manager.set_network_managers(&wifi_manager, &mqtt_manager);
+
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
     bool ota_failed = !failed_ota_build.isEmpty();
@@ -124,8 +135,9 @@ void setup() {
     
     // Initialize TaskManager with hardware and system interfaces
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
-    bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller, 
-                                              &grind_controller, &bluetooth_manager, &ui_manager);
+    bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller,
+                                              &grind_controller, &bluetooth_manager, &ui_manager,
+                                              &wifi_manager, &mqtt_manager);
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
@@ -137,8 +149,8 @@ void setup() {
     LOG_BLE("✅ TaskManager initialized successfully\n");
     
     // Initialize remaining task modules that depend on TaskManager queues
-    file_io_task.init(task_manager.get_file_io_queue());
-    
+    file_io_task.init(task_manager.get_file_io_queue(), task_manager.get_network_publish_queue());
+
     LOG_BLE("✅ All task modules initialized\n");
 }
 

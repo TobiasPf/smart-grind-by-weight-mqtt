@@ -15,7 +15,8 @@ FileIOTask::FileIOTask() {
     task_handle = nullptr;
     task_running = false;
     file_io_queue = nullptr;
-    
+    network_publish_queue = nullptr;
+
     // Initialize file I/O state
     filesystem_available = false;
     total_operations_processed = 0;
@@ -46,9 +47,10 @@ FileIOTask::~FileIOTask() {
     }
 }
 
-void FileIOTask::init(QueueHandle_t io_queue) {
+void FileIOTask::init(QueueHandle_t io_queue, QueueHandle_t network_queue) {
     file_io_queue = io_queue;
-    
+    network_publish_queue = network_queue;
+
     // Check initial filesystem availability
     filesystem_available = LittleFS.begin(true);
     if (filesystem_available) {
@@ -56,8 +58,9 @@ void FileIOTask::init(QueueHandle_t io_queue) {
     } else {
         LOG_BLE("FileIOTask: LittleFS filesystem unavailable\n");
     }
-    
-    LOG_BLE("FileIOTask: Initialized with file I/O queue\n");
+
+    LOG_BLE("FileIOTask: Initialized with file I/O queue%s\n",
+            network_publish_queue ? " and network publish queue" : "");
 }
 
 bool FileIOTask::start_task() {
@@ -222,9 +225,19 @@ void FileIOTask::process_flash_operation(const FlashOpRequest& request) {
             break;
             
         case FlashOpRequest::END_GRIND_SESSION:
-            LOG_BLE("[%lums FLASH_OP] Processing END_GRIND_SESSION: %s, %.2fg, %d pulses\n", 
+            LOG_BLE("[%lums FLASH_OP] Processing END_GRIND_SESSION: %s, %.2fg, %d pulses\n",
                     millis(), request.result_string, request.final_weight, request.pulse_count);
             grind_logger.end_grind_session(request.result_string, request.final_weight, request.pulse_count);
+
+            // Publish session to MQTT if network is enabled
+            if (network_publish_queue && grind_logger.get_current_session()) {
+                GrindSession session_copy = *grind_logger.get_current_session();
+                if (xQueueSend(network_publish_queue, &session_copy, 0) == pdPASS) {
+                    LOG_BLE("[MQTT] Queued session %lu for network publish\n", session_copy.session_id);
+                } else {
+                    LOG_BLE("[MQTT] WARNING: Failed to queue session for network publish (queue full)\n");
+                }
+            }
             break;
             
         default:

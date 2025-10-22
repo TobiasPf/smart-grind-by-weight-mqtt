@@ -8,6 +8,8 @@
 #include "../controllers/grind_controller.h"
 #include "../bluetooth/manager.h"
 #include "../ui/ui_manager.h"
+#include "../network/wifi_manager.h"
+#include "../network/mqtt_manager.h"
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
@@ -24,14 +26,16 @@ TaskManager* TaskManager::instance = nullptr;
 TaskManager::TaskManager() {
     memset(&task_handles, 0, sizeof(TaskHandles));
     memset(&task_queues, 0, sizeof(TaskQueues));
-    
+
     hardware_manager = nullptr;
     state_machine = nullptr;
     profile_controller = nullptr;
     grind_controller = nullptr;
     bluetooth_manager = nullptr;
     ui_manager = nullptr;
-    
+    wifi_manager = nullptr;
+    mqtt_manager = nullptr;
+
     tasks_initialized = false;
     ota_suspended = false;
     instance = this;
@@ -47,13 +51,16 @@ TaskManager::~TaskManager() {
 }
 
 bool TaskManager::init(HardwareManager* hw_mgr, StateMachine* sm, ProfileController* pc,
-                      GrindController* gc, BluetoothManager* bluetooth, UIManager* ui) {
+                      GrindController* gc, BluetoothManager* bluetooth, UIManager* ui,
+                      WiFiManager* wifi, MQTTManager* mqtt) {
     hardware_manager = hw_mgr;
     state_machine = sm;
     profile_controller = pc;
     grind_controller = gc;
     bluetooth_manager = bluetooth;
     ui_manager = ui;
+    wifi_manager = wifi;
+    mqtt_manager = mqtt;
     
     LOG_BLE("TaskManager: Initializing FreeRTOS task architecture...\n");
     
@@ -98,21 +105,33 @@ bool TaskManager::create_inter_task_queues() {
         LOG_BLE("ERROR: Failed to create file_io_queue\n");
         return false;
     }
-    
+
+    // Network publish queue
+    task_queues.network_publish_queue = xQueueCreate(SYS_QUEUE_NETWORK_PUBLISH_SIZE, sizeof(GrindSession));
+    if (!task_queues.network_publish_queue) {
+        LOG_BLE("ERROR: Failed to create network_publish_queue\n");
+        return false;
+    }
+
     LOG_BLE("TaskManager: Inter-task communication queues created successfully\n");
     return true;
 }
 
 void TaskManager::cleanup_queues() {
-    
+
     if (task_queues.ui_to_grind_queue) {
         vQueueDelete(task_queues.ui_to_grind_queue);
         task_queues.ui_to_grind_queue = nullptr;
     }
-    
+
     if (task_queues.file_io_queue) {
         vQueueDelete(task_queues.file_io_queue);
         task_queues.file_io_queue = nullptr;
+    }
+
+    if (task_queues.network_publish_queue) {
+        vQueueDelete(task_queues.network_publish_queue);
+        task_queues.network_publish_queue = nullptr;
     }
 }
 
@@ -144,7 +163,12 @@ bool TaskManager::create_all_tasks() {
         LOG_BLE("ERROR: Failed to create file I/O task\n");
         return false;
     }
-    
+
+    if (!create_network_task()) {
+        LOG_BLE("ERROR: Failed to create network task\n");
+        return false;
+    }
+
     return true;
 }
 
@@ -543,4 +567,77 @@ void TaskManager::print_task_status() const {
     LOG_BLE("  Bluetooth: %s\n", task_handles.bluetooth_task ? "RUNNING" : "NULL");
     LOG_BLE("  FileIO: %s\n", task_handles.file_io_task ? "RUNNING" : "NULL");
     LOG_BLE("========================\n");
+}
+
+bool TaskManager::create_network_task() {
+    BaseType_t result = xTaskCreatePinnedToCore(
+        network_task_wrapper,
+        "Network",
+        SYS_TASK_NETWORK_STACK_SIZE,
+        nullptr,
+        SYS_TASK_PRIORITY_NETWORK,
+        &task_handles.network_task,
+        1  // Core 1 (UI core)
+    );
+
+    if (result != pdPASS) {
+        LOG_BLE("ERROR: Failed to create network task\n");
+        return false;
+    }
+
+    LOG_BLE("TaskManager: Network task created (Core 1, Priority %d, %dms interval)\n",
+            SYS_TASK_PRIORITY_NETWORK, SYS_TASK_NETWORK_INTERVAL_MS);
+    return true;
+}
+
+void TaskManager::network_task_wrapper(void* parameter) {
+    if (instance) {
+        instance->network_task_impl();
+    }
+}
+
+void TaskManager::network_task_impl() {
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const TickType_t task_period = pdMS_TO_TICKS(SYS_TASK_NETWORK_INTERVAL_MS);
+    const int task_index = 5; // Index for network task metrics
+
+    LOG_BLE("Network task started on Core %d\n", xPortGetCoreID());
+
+    while (true) {
+        unsigned long start_time = millis();
+
+        // Handle WiFi connection management
+        if (wifi_manager) {
+            wifi_manager->handle();
+        }
+
+        // Handle MQTT connection and publishes
+        if (mqtt_manager) {
+            mqtt_manager->handle();
+        }
+
+        // Process any pending grind sessions from queue
+        GrindSession session;
+        while (xQueueReceive(task_queues.network_publish_queue, &session, 0) == pdPASS) {
+            // Publish session to MQTT
+            if (mqtt_manager && mqtt_manager->is_enabled()) {
+                mqtt_manager->publish_session(&session);
+            }
+        }
+
+        // Record timing
+        unsigned long end_time = millis();
+        record_task_timing(task_index, start_time, end_time);
+
+        // Heartbeat logging (if enabled)
+        #if SYS_ENABLE_REALTIME_HEARTBEAT
+        if ((end_time - task_metrics[task_index].last_heartbeat_time) >= SYS_REALTIME_HEARTBEAT_INTERVAL_MS) {
+            print_task_heartbeat(task_index, "Network");
+            task_metrics[task_index].last_heartbeat_time = end_time;
+        }
+        #endif
+
+        // Fixed-interval delay
+        vTaskDelayUntil(&last_wake_time, task_period);
+    }
 }

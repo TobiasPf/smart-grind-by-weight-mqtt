@@ -23,6 +23,7 @@ BluetoothManager::BluetoothManager()
     , data_service(nullptr)
     , debug_service(nullptr)
     , sysinfo_service(nullptr)
+    , network_service(nullptr)
     , ota_data_characteristic(nullptr)
     , ota_control_characteristic(nullptr)
     , ota_status_characteristic(nullptr)
@@ -37,6 +38,12 @@ BluetoothManager::BluetoothManager()
     , sysinfo_hardware_characteristic(nullptr)
     , sysinfo_sessions_characteristic(nullptr)
     , sysinfo_diagnostics_characteristic(nullptr)
+    , network_wifi_characteristic(nullptr)
+    , network_mqtt_characteristic(nullptr)
+    , network_status_characteristic(nullptr)
+    , network_control_characteristic(nullptr)
+    , wifi_manager(nullptr)
+    , mqtt_manager(nullptr)
     , device_connected(false)
     , ble_enabled(false), debug_stream_active(false)
     , enable_time(0)
@@ -62,6 +69,13 @@ void BluetoothManager::init(Preferences* prefs) {
     if (!ui_status_queue) {
         ui_status_queue = xQueueCreate(8, sizeof(UIStatusMessage));
     }
+}
+
+void BluetoothManager::set_network_managers(WiFiManager* wifi, MQTTManager* mqtt) {
+    wifi_manager = wifi;
+    mqtt_manager = mqtt;
+    network_config_service.init(wifi, mqtt);
+    log("Bluetooth: Network managers linked to BLE service\n");
 }
 
 void BluetoothManager::set_ui_status_callback(UIStatusCallback callback) {
@@ -231,6 +245,38 @@ void BluetoothManager::enable(unsigned long timeout_ms) {
     sysinfo_diagnostics_characteristic->setCallbacks(this);
     delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
 
+    // Create network config service
+    network_service = ble_server->createService(BLE_NETWORK_SERVICE_UUID);
+    delay(BLE_INIT_SERVICE_DELAY_MS);
+
+    network_wifi_characteristic = network_service->createCharacteristic(
+        BLE_NETWORK_WIFI_CHAR_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    network_wifi_characteristic->setCallbacks(this);
+    delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
+
+    network_mqtt_characteristic = network_service->createCharacteristic(
+        BLE_NETWORK_MQTT_CHAR_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    network_mqtt_characteristic->setCallbacks(this);
+    delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
+
+    network_status_characteristic = network_service->createCharacteristic(
+        BLE_NETWORK_STATUS_CHAR_UUID,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+    );
+    network_status_characteristic->setCallbacks(this);
+    delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
+
+    network_control_characteristic = network_service->createCharacteristic(
+        BLE_NETWORK_CONTROL_CHAR_UUID,
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    network_control_characteristic->setCallbacks(this);
+    delay(BLE_INIT_CHARACTERISTIC_DELAY_MS);
+
     ota_service->start();
     delay(BLE_INIT_START_DELAY_MS);
     
@@ -242,12 +288,16 @@ void BluetoothManager::enable(unsigned long timeout_ms) {
     
     sysinfo_service->start();
     delay(BLE_INIT_START_DELAY_MS);
-    
+
+    network_service->start();
+    delay(BLE_INIT_START_DELAY_MS);
+
     BLEAdvertising* advertising = BLEDevice::getAdvertising();
     advertising->addServiceUUID(BLE_OTA_SERVICE_UUID);
     advertising->addServiceUUID(BLE_DEBUG_SERVICE_UUID);
     advertising->addServiceUUID(BLE_DATA_SERVICE_UUID);
     advertising->addServiceUUID(BLE_SYSINFO_SERVICE_UUID);
+    advertising->addServiceUUID(BLE_NETWORK_SERVICE_UUID);
     advertising->setScanResponse(true);
     advertising->setMinPreferred(0x06);
     advertising->setMinPreferred(0x12);
@@ -878,13 +928,25 @@ void BluetoothManager::onWrite(BLECharacteristic* characteristic) {
     } else if (characteristic == sysinfo_diagnostics_characteristic) {
         LOG_BLE("  -> QUEUING DIAGNOSTIC REPORT REQUEST\n");
         diagnostic_report_pending = true; // Defer heavy work to bluetooth task context
+    } else if (characteristic == network_wifi_characteristic ||
+               characteristic == network_mqtt_characteristic ||
+               characteristic == network_control_characteristic) {
+        LOG_BLE("  -> Handling network config\n");
+        handle_network_characteristic_write(characteristic);
     } else {
         LOG_BLE("  -> UNKNOWN characteristic!\n");
     }
 }
 
 void BluetoothManager::onRead(BLECharacteristic* characteristic) {
-    // Reserved for future use
+    if (characteristic == network_status_characteristic) {
+        // Update network status when read
+        uint8_t buffer[BLE_NETWORK_MAX_PAYLOAD_BYTES];
+        size_t len = network_config_service.handle_status_read(buffer, sizeof(buffer));
+        if (len > 0) {
+            network_status_characteristic->setValue(buffer, len);
+        }
+    }
 }
 
 String BluetoothManager::check_ota_failure_after_boot() {
@@ -1717,3 +1779,51 @@ void BluetoothManager::generate_diagnostic_report() {
     send_chunk(buf);
     LOG_BLE("=== DIAGNOSTICS: Report generation COMPLETED ===\n");
 }
+
+void BluetoothManager::handle_network_characteristic_write(BLECharacteristic* characteristic) {
+    std::string value = characteristic->getValue();
+    uint8_t* data = (uint8_t*)value.data();
+    size_t length = value.length();
+
+    if (characteristic == network_wifi_characteristic) {
+        bool success = network_config_service.handle_wifi_credentials_write(data, length);
+        if (success) {
+            log("Network: WiFi credentials updated via BLE\n");
+            // Update status characteristic
+            String status_json;
+            if (network_config_service.get_status_json(status_json)) {
+                network_status_characteristic->setValue(status_json.c_str());
+                network_status_characteristic->notify();
+            }
+        } else {
+            log("Network: Failed to update WiFi credentials\n");
+        }
+    } else if (characteristic == network_mqtt_characteristic) {
+        bool success = network_config_service.handle_mqtt_config_write(data, length);
+        if (success) {
+            log("Network: MQTT config updated via BLE\n");
+            // Update status characteristic
+            String status_json;
+            if (network_config_service.get_status_json(status_json)) {
+                network_status_characteristic->setValue(status_json.c_str());
+                network_status_characteristic->notify();
+            }
+        } else {
+            log("Network: Failed to update MQTT config\n");
+        }
+    } else if (characteristic == network_control_characteristic) {
+        bool success = network_config_service.handle_control_write(data, length);
+        if (success) {
+            log("Network: Control command executed\n");
+            // Update status characteristic
+            String status_json;
+            if (network_config_service.get_status_json(status_json)) {
+                network_status_characteristic->setValue(status_json.c_str());
+                network_status_characteristic->notify();
+            }
+        } else {
+            log("Network: Failed to execute control command\n");
+        }
+    }
+}
+

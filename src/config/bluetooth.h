@@ -49,6 +49,17 @@
 #define BLE_SYSINFO_MAX_PAYLOAD_BYTES 512                                       // Maximum payload size for system info
 
 //------------------------------------------------------------------------------
+// BLE NETWORK CONFIG SERVICE
+//------------------------------------------------------------------------------
+#define BLE_NETWORK_SERVICE_UUID "88990011-aabb-ccdd-eeff-112233445566"        // Network configuration service UUID
+#define BLE_NETWORK_WIFI_CHAR_UUID "99001122-bbcc-ddee-ff11-223344556677"      // WiFi credentials (write: "SSID|password")
+#define BLE_NETWORK_MQTT_CHAR_UUID "00112233-ccdd-eeff-1122-334455667788"      // MQTT config (write: "host:port|username|password")
+#define BLE_NETWORK_STATUS_CHAR_UUID "11223344-ddee-ff11-2233-445566778899"    // Network status (read/notify: JSON status)
+#define BLE_NETWORK_CONTROL_CHAR_UUID "22334455-eeff-1122-3344-556677889900"   // Network control (write: commands)
+
+#define BLE_NETWORK_MAX_PAYLOAD_BYTES 512                                       // Maximum payload size for network config
+
+//------------------------------------------------------------------------------
 // BLE TIMEOUT SETTINGS
 //------------------------------------------------------------------------------
 #define BLE_AUTO_DISABLE_TIMEOUT_MS (30 * 60 * 1000)                          // Auto-disable BLE after inactivity

@@ -7,11 +7,13 @@
 
 // Forward declarations
 class HardwareManager;
-class StateMachine; 
+class StateMachine;
 class ProfileController;
 class GrindController;
 class BluetoothManager;
 class UIManager;
+class WiFiManager;
+class MQTTManager;
 
 // Task handle storage for all FreeRTOS tasks
 struct TaskHandles {
@@ -20,12 +22,14 @@ struct TaskHandles {
     TaskHandle_t ui_render_task;
     TaskHandle_t bluetooth_task;
     TaskHandle_t file_io_task;
+    TaskHandle_t network_task;
 };
 
 // Inter-task communication queues
 struct TaskQueues {
     QueueHandle_t ui_to_grind_queue;        // UI events → Grind Controller
     QueueHandle_t file_io_queue;            // Any task → File I/O
+    QueueHandle_t network_publish_queue;    // Any task → Network (for MQTT publishes)
 };
 
 // Task timing metrics for monitoring
@@ -66,13 +70,15 @@ private:
     // Hardware and system references
     HardwareManager* hardware_manager;
     StateMachine* state_machine;
-    ProfileController* profile_controller; 
+    ProfileController* profile_controller;
     GrindController* grind_controller;
     BluetoothManager* bluetooth_manager;
     UIManager* ui_manager;
-    
+    WiFiManager* wifi_manager;
+    MQTTManager* mqtt_manager;
+
     // Task monitoring
-    TaskMetrics task_metrics[5]; // One for each task
+    TaskMetrics task_metrics[6]; // One for each task
     bool tasks_initialized;
     bool ota_suspended;
     
@@ -85,7 +91,8 @@ public:
     
     // Initialization
     bool init(HardwareManager* hw_mgr, StateMachine* sm, ProfileController* pc,
-              GrindController* gc, BluetoothManager* bluetooth, UIManager* ui);
+              GrindController* gc, BluetoothManager* bluetooth, UIManager* ui,
+              WiFiManager* wifi, MQTTManager* mqtt);
     
     // Task lifecycle management
     bool create_all_tasks();
@@ -96,6 +103,7 @@ public:
     // Queue access
     QueueHandle_t get_ui_to_grind_queue() const { return task_queues.ui_to_grind_queue; }
     QueueHandle_t get_file_io_queue() const { return task_queues.file_io_queue; }
+    QueueHandle_t get_network_publish_queue() const { return task_queues.network_publish_queue; }
     
     // Task monitoring
     bool are_tasks_healthy() const;
@@ -107,6 +115,7 @@ public:
     static void ui_render_task_wrapper(void* parameter);
     static void bluetooth_task_wrapper(void* parameter);
     static void file_io_task_wrapper(void* parameter);
+    static void network_task_wrapper(void* parameter);
     
 private:
     // Task creation helpers
@@ -115,6 +124,7 @@ private:
     bool create_ui_render_task();
     bool create_bluetooth_task();
     bool create_file_io_task();
+    bool create_network_task();
     
     // Queue creation
     bool create_inter_task_queues();
@@ -126,6 +136,7 @@ private:
     void ui_render_task_impl();
     void bluetooth_task_impl();
     void file_io_task_impl();
+    void network_task_impl();
     
     // Performance monitoring
     void record_task_timing(int task_index, uint32_t start_time, uint32_t end_time);
