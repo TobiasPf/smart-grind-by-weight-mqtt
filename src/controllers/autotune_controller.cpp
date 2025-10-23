@@ -200,6 +200,10 @@ void AutoTuneController::update_priming_phase() {
             break;
         }
 
+        case AutoTuneSubPhase::RESULT_LOGGED:
+            // Result logged, waiting for next cycle
+            break;
+
         case AutoTuneSubPhase::TARING:
             update_tare();
             break;
