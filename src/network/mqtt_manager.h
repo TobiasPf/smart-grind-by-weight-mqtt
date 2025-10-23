@@ -110,7 +110,7 @@ public:
     /**
      * Check if MQTT is connected
      */
-    bool is_connected() const { return status == MQTTConnectionStatus::MQTT_CONNECTED; }
+    bool is_connected() const { return status == MQTTConnectionStatus::Connected; }
 
     /**
      * Get broker address

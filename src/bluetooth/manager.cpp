@@ -1781,8 +1781,8 @@ void BluetoothManager::generate_diagnostic_report() {
 }
 
 void BluetoothManager::handle_network_characteristic_write(BLECharacteristic* characteristic) {
-    std::string value = characteristic->getValue();
-    uint8_t* data = (uint8_t*)value.data();
+    String value = characteristic->getValue();
+    uint8_t* data = (uint8_t*)value.c_str();
     size_t length = value.length();
 
     if (characteristic == network_wifi_characteristic) {
