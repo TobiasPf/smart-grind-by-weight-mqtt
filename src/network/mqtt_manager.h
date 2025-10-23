@@ -14,11 +14,11 @@
  * MQTTConnectionStatus - Current MQTT connection state
  */
 enum class MQTTConnectionStatus {
-    MQTT_DISABLED,       // MQTT is disabled
-    MQTT_DISCONNECTED,   // MQTT is enabled but not connected
-    MQTT_CONNECTING,     // Attempting to connect to broker
-    MQTT_CONNECTED,      // Successfully connected to broker
-    MQTT_ERROR          // Connection error (failed after retries)
+    Disabled,       // MQTT is disabled
+    Disconnected,   // MQTT is enabled but not connected
+    Connecting,     // Attempting to connect to broker
+    Connected,      // Successfully connected to broker
+    Failed          // Connection error (failed after retries)
 };
 
 /**

@@ -10,11 +10,11 @@
  * WiFiConnectionStatus - Current WiFi connection state
  */
 enum class WiFiConnectionStatus {
-    WIFI_DISABLED,       // WiFi is disabled
-    WIFI_DISCONNECTED,   // WiFi is enabled but not connected
-    WIFI_CONNECTING,     // Attempting to connect
-    WIFI_CONNECTED,      // Successfully connected
-    WIFI_ERROR          // Connection error (failed after retries)
+    Disabled,       // WiFi is disabled
+    Disconnected,   // WiFi is enabled but not connected
+    Connecting,     // Attempting to connect
+    Connected,      // Successfully connected
+    Failed          // Connection error (failed after retries)
 };
 
 /**
@@ -74,7 +74,7 @@ public:
     /**
      * Check if WiFi is connected
      */
-    bool is_connected() const { return status == WiFiConnectionStatus::WIFI_CONNECTED; }
+    bool is_connected() const { return status == WiFiConnectionStatus::Connected; }
 
     /**
      * Get current SSID (returns empty string if not configured)
