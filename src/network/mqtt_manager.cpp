@@ -5,7 +5,7 @@ MQTTManager::MQTTManager()
     , mqtt_client(wifi_client)
     , port(MQTT_DEFAULT_PORT)
     , enabled(false)
-    , status(MQTTConnectionStatus::DISABLED)
+    , status(MQTTConnectionStatus::MQTT_DISABLED)
     , last_connection_attempt(0)
     , reconnect_interval(MQTT_RECONNECT_INTERVAL_MS)
     , reconnect_attempts(0)
@@ -42,21 +42,21 @@ void MQTTManager::init(Preferences* prefs) {
 }
 
 void MQTTManager::enable() {
-    if (enabled && status != MQTTConnectionStatus::DISABLED) {
+    if (enabled && status != MQTTConnectionStatus::MQTT_DISABLED) {
         Serial.println("[MQTT] Already enabled");
         return;
     }
 
     if (!has_broker_config()) {
         Serial.println("[MQTT] Error: No broker configured");
-        update_status(MQTTConnectionStatus::ERROR);
+        update_status(MQTTConnectionStatus::MQTT_ERROR);
         return;
     }
 
     // Check if WiFi is connected
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("[MQTT] Error: WiFi not connected");
-        update_status(MQTTConnectionStatus::ERROR);
+        update_status(MQTTConnectionStatus::MQTT_ERROR);
         return;
     }
 
@@ -100,7 +100,7 @@ void MQTTManager::disable() {
         mqtt_client.disconnect();
     }
 
-    update_status(MQTTConnectionStatus::DISABLED);
+    update_status(MQTTConnectionStatus::MQTT_DISABLED);
 
     // Clear publish queue
     while (!publish_queue.empty()) {
@@ -115,9 +115,9 @@ void MQTTManager::handle() {
 
     // Check if WiFi is still connected
     if (WiFi.status() != WL_CONNECTED) {
-        if (status != MQTTConnectionStatus::ERROR) {
+        if (status != MQTTConnectionStatus::MQTT_ERROR) {
             Serial.println("[MQTT] WiFi disconnected");
-            update_status(MQTTConnectionStatus::ERROR);
+            update_status(MQTTConnectionStatus::MQTT_ERROR);
         }
         return;
     }
@@ -129,15 +129,15 @@ void MQTTManager::handle() {
 
     // Check connection status
     switch (status) {
-        case MQTTConnectionStatus::DISABLED:
+        case MQTTConnectionStatus::MQTT_DISABLED:
             // Should not be here if enabled
             break;
 
-        case MQTTConnectionStatus::CONNECTING:
+        case MQTTConnectionStatus::MQTT_CONNECTING:
             // Check if connection succeeded or timed out
             if (mqtt_client.connected()) {
-                update_status(MQTTConnectionStatus::CONNECTED);
-                log_status(MQTTConnectionStatus::CONNECTED, broker.c_str());
+                update_status(MQTTConnectionStatus::MQTT_CONNECTED);
+                log_status(MQTTConnectionStatus::MQTT_CONNECTED, broker.c_str());
                 reconnect_attempts = 0;
                 reconnect_interval = MQTT_RECONNECT_INTERVAL_MS;
 
@@ -145,16 +145,16 @@ void MQTTManager::handle() {
                 process_publish_queue();
             } else if (millis() - last_connection_attempt > MQTT_CONNECTION_TIMEOUT_MS) {
                 Serial.println("[MQTT] Connection timeout");
-                update_status(MQTTConnectionStatus::DISCONNECTED);
+                update_status(MQTTConnectionStatus::MQTT_DISCONNECTED);
                 handle_reconnect();
             }
             break;
 
-        case MQTTConnectionStatus::CONNECTED:
+        case MQTTConnectionStatus::MQTT_CONNECTED:
             // Check if connection was lost
             if (!mqtt_client.connected()) {
                 Serial.println("[MQTT] Connection lost");
-                update_status(MQTTConnectionStatus::DISCONNECTED);
+                update_status(MQTTConnectionStatus::MQTT_DISCONNECTED);
                 reconnect_attempts = 0;
                 reconnect_interval = MQTT_RECONNECT_INTERVAL_MS;
                 handle_reconnect();
@@ -164,8 +164,8 @@ void MQTTManager::handle() {
             }
             break;
 
-        case MQTTConnectionStatus::DISCONNECTED:
-        case MQTTConnectionStatus::ERROR:
+        case MQTTConnectionStatus::MQTT_DISCONNECTED:
+        case MQTTConnectionStatus::MQTT_ERROR:
             // Attempt reconnection
             handle_reconnect();
             break;
@@ -244,7 +244,7 @@ MQTTPublishResult MQTTManager::publish_session(const GrindSession* session) {
     Serial.printf("[MQTT] Payload size: %d bytes\n", json_payload.length());
 
     // Attempt to publish
-    if (status == MQTTConnectionStatus::CONNECTED) {
+    if (status == MQTTConnectionStatus::MQTT_CONNECTED) {
         bool success = publish(topic.c_str(), json_payload.c_str(), MQTT_RETAIN_SESSIONS);
 
         if (success) {
@@ -308,7 +308,7 @@ void MQTTManager::clear_broker_config() {
 }
 
 bool MQTTManager::test_connection() {
-    if (status != MQTTConnectionStatus::CONNECTED) {
+    if (status != MQTTConnectionStatus::MQTT_CONNECTED) {
         Serial.println("[MQTT] Cannot test: Not connected");
         return false;
     }
@@ -350,18 +350,18 @@ void MQTTManager::load_broker_config() {
 void MQTTManager::connect() {
     if (!has_broker_config()) {
         Serial.println("[MQTT] Cannot connect: No broker configured");
-        update_status(MQTTConnectionStatus::ERROR);
+        update_status(MQTTConnectionStatus::MQTT_ERROR);
         return;
     }
 
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("[MQTT] Cannot connect: WiFi not connected");
-        update_status(MQTTConnectionStatus::ERROR);
+        update_status(MQTTConnectionStatus::MQTT_ERROR);
         return;
     }
 
     Serial.printf("[MQTT] Connecting to broker: %s:%d\n", broker.c_str(), port);
-    update_status(MQTTConnectionStatus::CONNECTING);
+    update_status(MQTTConnectionStatus::MQTT_CONNECTING);
 
     // Build client ID from device ID
     String client_id = GrindSessionSerializer::get_device_id();
@@ -415,7 +415,7 @@ void MQTTManager::handle_reconnect() {
 }
 
 void MQTTManager::process_publish_queue() {
-    if (status != MQTTConnectionStatus::CONNECTED) {
+    if (status != MQTTConnectionStatus::MQTT_CONNECTED) {
         return;
     }
 
@@ -481,19 +481,19 @@ void MQTTManager::update_status(MQTTConnectionStatus new_status) {
 void MQTTManager::log_status(MQTTConnectionStatus s, const char* extra) {
     const char* status_str = "UNKNOWN";
     switch (s) {
-        case MQTTConnectionStatus::DISABLED:
+        case MQTTConnectionStatus::MQTT_DISABLED:
             status_str = "DISABLED";
             break;
-        case MQTTConnectionStatus::DISCONNECTED:
+        case MQTTConnectionStatus::MQTT_DISCONNECTED:
             status_str = "DISCONNECTED";
             break;
-        case MQTTConnectionStatus::CONNECTING:
+        case MQTTConnectionStatus::MQTT_CONNECTING:
             status_str = "CONNECTING";
             break;
-        case MQTTConnectionStatus::CONNECTED:
+        case MQTTConnectionStatus::MQTT_CONNECTED:
             status_str = "CONNECTED";
             break;
-        case MQTTConnectionStatus::ERROR:
+        case MQTTConnectionStatus::MQTT_ERROR:
             status_str = "ERROR";
             break;
     }

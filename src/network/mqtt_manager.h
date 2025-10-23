@@ -14,11 +14,11 @@
  * MQTTConnectionStatus - Current MQTT connection state
  */
 enum class MQTTConnectionStatus {
-    DISABLED,       // MQTT is disabled
-    DISCONNECTED,   // MQTT is enabled but not connected
-    CONNECTING,     // Attempting to connect to broker
-    CONNECTED,      // Successfully connected to broker
-    ERROR          // Connection error (failed after retries)
+    MQTT_DISABLED,       // MQTT is disabled
+    MQTT_DISCONNECTED,   // MQTT is enabled but not connected
+    MQTT_CONNECTING,     // Attempting to connect to broker
+    MQTT_CONNECTED,      // Successfully connected to broker
+    MQTT_ERROR          // Connection error (failed after retries)
 };
 
 /**
@@ -110,7 +110,7 @@ public:
     /**
      * Check if MQTT is connected
      */
-    bool is_connected() const { return status == MQTTConnectionStatus::CONNECTED; }
+    bool is_connected() const { return status == MQTTConnectionStatus::MQTT_CONNECTED; }
 
     /**
      * Get broker address

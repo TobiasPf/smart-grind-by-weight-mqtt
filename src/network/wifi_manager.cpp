@@ -3,7 +3,7 @@
 WiFiManager::WiFiManager()
     : preferences(nullptr)
     , enabled(false)
-    , status(WiFiConnectionStatus::DISABLED)
+    , status(WiFiConnectionStatus::WIFI_DISABLED)
     , last_connection_attempt(0)
     , reconnect_interval(WIFI_RECONNECT_INTERVAL_MS)
     , reconnect_attempts(0)
@@ -38,14 +38,14 @@ void WiFiManager::init(Preferences* prefs) {
 }
 
 void WiFiManager::enable() {
-    if (enabled && status != WiFiConnectionStatus::DISABLED) {
+    if (enabled && status != WiFiConnectionStatus::WIFI_DISABLED) {
         Serial.println("[WiFi] Already enabled");
         return;
     }
 
     if (!has_credentials()) {
         Serial.println("[WiFi] Error: No credentials configured");
-        update_status(WiFiConnectionStatus::ERROR);
+        update_status(WiFiConnectionStatus::WIFI_ERROR);
         return;
     }
 
@@ -87,7 +87,7 @@ void WiFiManager::disable() {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
 
-    update_status(WiFiConnectionStatus::DISABLED);
+    update_status(WiFiConnectionStatus::WIFI_DISABLED);
 }
 
 void WiFiManager::handle() {
@@ -99,38 +99,38 @@ void WiFiManager::handle() {
     wl_status_t wl_status = WiFi.status();
 
     switch (status) {
-        case WiFiConnectionStatus::DISABLED:
+        case WiFiConnectionStatus::WIFI_DISABLED:
             // Should not be here if enabled
             break;
 
-        case WiFiConnectionStatus::CONNECTING:
+        case WiFiConnectionStatus::WIFI_CONNECTING:
             // Check if connection succeeded or timed out
             if (wl_status == WL_CONNECTED) {
-                update_status(WiFiConnectionStatus::CONNECTED);
-                log_status(WiFiConnectionStatus::CONNECTED, WiFi.localIP().toString().c_str());
+                update_status(WiFiConnectionStatus::WIFI_CONNECTED);
+                log_status(WiFiConnectionStatus::WIFI_CONNECTED, WiFi.localIP().toString().c_str());
                 reconnect_attempts = 0;
                 reconnect_interval = WIFI_RECONNECT_INTERVAL_MS;
             } else if (millis() - last_connection_attempt > WIFI_CONNECTION_TIMEOUT_MS) {
                 Serial.println("[WiFi] Connection timeout");
                 WiFi.disconnect();
-                update_status(WiFiConnectionStatus::DISCONNECTED);
+                update_status(WiFiConnectionStatus::WIFI_DISCONNECTED);
                 handle_reconnect();
             }
             break;
 
-        case WiFiConnectionStatus::CONNECTED:
+        case WiFiConnectionStatus::WIFI_CONNECTED:
             // Check if connection was lost
             if (wl_status != WL_CONNECTED) {
                 Serial.println("[WiFi] Connection lost");
-                update_status(WiFiConnectionStatus::DISCONNECTED);
+                update_status(WiFiConnectionStatus::WIFI_DISCONNECTED);
                 reconnect_attempts = 0;
                 reconnect_interval = WIFI_RECONNECT_INTERVAL_MS;
                 handle_reconnect();
             }
             break;
 
-        case WiFiConnectionStatus::DISCONNECTED:
-        case WiFiConnectionStatus::ERROR:
+        case WiFiConnectionStatus::WIFI_DISCONNECTED:
+        case WiFiConnectionStatus::WIFI_ERROR:
             // Attempt reconnection
             handle_reconnect();
             break;
@@ -175,14 +175,14 @@ bool WiFiManager::set_credentials(const char* new_ssid, const char* new_password
 }
 
 String WiFiManager::get_ip_address() const {
-    if (status == WiFiConnectionStatus::CONNECTED) {
+    if (status == WiFiConnectionStatus::WIFI_CONNECTED) {
         return WiFi.localIP().toString();
     }
     return String("");
 }
 
 int WiFiManager::get_rssi() const {
-    if (status == WiFiConnectionStatus::CONNECTED) {
+    if (status == WiFiConnectionStatus::WIFI_CONNECTED) {
         return WiFi.RSSI();
     }
     return 0;
@@ -230,12 +230,12 @@ void WiFiManager::load_credentials() {
 void WiFiManager::connect() {
     if (!has_credentials()) {
         Serial.println("[WiFi] Cannot connect: No credentials");
-        update_status(WiFiConnectionStatus::ERROR);
+        update_status(WiFiConnectionStatus::WIFI_ERROR);
         return;
     }
 
     Serial.printf("[WiFi] Connecting to: %s\n", ssid.c_str());
-    update_status(WiFiConnectionStatus::CONNECTING);
+    update_status(WiFiConnectionStatus::WIFI_CONNECTING);
 
     WiFi.begin(ssid.c_str(), password.c_str());
     last_connection_attempt = millis();
@@ -244,9 +244,9 @@ void WiFiManager::connect() {
 void WiFiManager::handle_reconnect() {
     // Check if we've exceeded max attempts
     if (reconnect_attempts >= WIFI_MAX_RECONNECT_ATTEMPTS) {
-        if (status != WiFiConnectionStatus::ERROR) {
+        if (status != WiFiConnectionStatus::WIFI_ERROR) {
             Serial.println("[WiFi] Max reconnect attempts reached");
-            update_status(WiFiConnectionStatus::ERROR);
+            update_status(WiFiConnectionStatus::WIFI_ERROR);
         }
         return;
     }
@@ -280,19 +280,19 @@ void WiFiManager::update_status(WiFiConnectionStatus new_status) {
 void WiFiManager::log_status(WiFiConnectionStatus s, const char* extra) {
     const char* status_str = "UNKNOWN";
     switch (s) {
-        case WiFiConnectionStatus::DISABLED:
+        case WiFiConnectionStatus::WIFI_DISABLED:
             status_str = "DISABLED";
             break;
-        case WiFiConnectionStatus::DISCONNECTED:
+        case WiFiConnectionStatus::WIFI_DISCONNECTED:
             status_str = "DISCONNECTED";
             break;
-        case WiFiConnectionStatus::CONNECTING:
+        case WiFiConnectionStatus::WIFI_CONNECTING:
             status_str = "CONNECTING";
             break;
-        case WiFiConnectionStatus::CONNECTED:
+        case WiFiConnectionStatus::WIFI_CONNECTED:
             status_str = "CONNECTED";
             break;
-        case WiFiConnectionStatus::ERROR:
+        case WiFiConnectionStatus::WIFI_ERROR:
             status_str = "ERROR";
             break;
     }

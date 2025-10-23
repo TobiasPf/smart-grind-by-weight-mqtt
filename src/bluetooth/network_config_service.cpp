@@ -116,19 +116,19 @@ bool NetworkConfigService::get_status_json(String& out) {
 
     // WiFi status string
     switch (wifi_manager->get_status()) {
-        case WiFiConnectionStatus::DISABLED:
+        case WiFiConnectionStatus::WIFI_DISABLED:
             wifi["status"] = "disabled";
             break;
-        case WiFiConnectionStatus::DISCONNECTED:
+        case WiFiConnectionStatus::WIFI_DISCONNECTED:
             wifi["status"] = "disconnected";
             break;
-        case WiFiConnectionStatus::CONNECTING:
+        case WiFiConnectionStatus::WIFI_CONNECTING:
             wifi["status"] = "connecting";
             break;
-        case WiFiConnectionStatus::CONNECTED:
+        case WiFiConnectionStatus::WIFI_CONNECTED:
             wifi["status"] = "connected";
             break;
-        case WiFiConnectionStatus::ERROR:
+        case WiFiConnectionStatus::WIFI_ERROR:
             wifi["status"] = "error";
             break;
     }
@@ -148,19 +148,19 @@ bool NetworkConfigService::get_status_json(String& out) {
 
     // MQTT status string
     switch (mqtt_manager->get_status()) {
-        case MQTTConnectionStatus::DISABLED:
+        case MQTTConnectionStatus::MQTT_DISABLED:
             mqtt["status"] = "disabled";
             break;
-        case MQTTConnectionStatus::DISCONNECTED:
+        case MQTTConnectionStatus::MQTT_DISCONNECTED:
             mqtt["status"] = "disconnected";
             break;
-        case MQTTConnectionStatus::CONNECTING:
+        case MQTTConnectionStatus::MQTT_CONNECTING:
             mqtt["status"] = "connecting";
             break;
-        case MQTTConnectionStatus::CONNECTED:
+        case MQTTConnectionStatus::MQTT_CONNECTED:
             mqtt["status"] = "connected";
             break;
-        case MQTTConnectionStatus::ERROR:
+        case MQTTConnectionStatus::MQTT_ERROR:
             mqtt["status"] = "error";
             break;
     }
