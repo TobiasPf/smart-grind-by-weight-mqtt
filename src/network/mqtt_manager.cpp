@@ -406,7 +406,7 @@ void MQTTManager::handle_reconnect() {
 
     // Increment attempts and apply exponential backoff
     reconnect_attempts++;
-    reconnect_interval = min(reconnect_interval * 2, MQTT_MAX_RECONNECT_INTERVAL_MS);
+    reconnect_interval = min(reconnect_interval * 2, (unsigned long)MQTT_MAX_RECONNECT_INTERVAL_MS);
 
     Serial.printf("[MQTT] Reconnect attempt %d (next in %lums)\n",
                   reconnect_attempts, reconnect_interval);

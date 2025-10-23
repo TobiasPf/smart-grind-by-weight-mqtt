@@ -198,6 +198,7 @@ public:
     // Data access
     uint32_t get_total_flash_sessions() const;
     bool is_logging_active() const { return logging_active; }
+    const GrindSession* get_current_session() const { return current_session; }
     
     // Debug output helpers - conditionally compiled based on debug flags (moved to public for BLE access)
 #if ENABLE_GRIND_DEBUG

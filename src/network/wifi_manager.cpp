@@ -258,7 +258,7 @@ void WiFiManager::handle_reconnect() {
 
     // Increment attempts and apply exponential backoff
     reconnect_attempts++;
-    reconnect_interval = min(reconnect_interval * 2, WIFI_MAX_RECONNECT_INTERVAL_MS);
+    reconnect_interval = min(reconnect_interval * 2, (unsigned long)WIFI_MAX_RECONNECT_INTERVAL_MS);
 
     Serial.printf("[WiFi] Reconnect attempt %d/%d (next in %lums)\n",
                   reconnect_attempts, WIFI_MAX_RECONNECT_ATTEMPTS, reconnect_interval);
