@@ -106,11 +106,16 @@ bool TaskManager::create_inter_task_queues() {
         return false;
     }
 
-    // Network publish queue
-    task_queues.network_publish_queue = xQueueCreate(SYS_QUEUE_NETWORK_PUBLISH_SIZE, sizeof(GrindSession));
-    if (!task_queues.network_publish_queue) {
-        LOG_BLE("ERROR: Failed to create network_publish_queue\n");
-        return false;
+    // Network publish queue (only if WiFi or MQTT managers are present)
+    if (wifi_manager || mqtt_manager) {
+        task_queues.network_publish_queue = xQueueCreate(SYS_QUEUE_NETWORK_PUBLISH_SIZE, sizeof(GrindSession));
+        if (!task_queues.network_publish_queue) {
+            LOG_BLE("ERROR: Failed to create network_publish_queue\n");
+            return false;
+        }
+    } else {
+        task_queues.network_publish_queue = nullptr;
+        LOG_BLE("Network publish queue: Skipped (network managers disabled)\n");
     }
 
     LOG_BLE("TaskManager: Inter-task communication queues created successfully\n");

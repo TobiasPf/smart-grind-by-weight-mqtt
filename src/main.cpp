@@ -80,12 +80,12 @@ void setup() {
     
     bluetooth_manager.init(hardware_manager.get_preferences());
 
-    // Initialize WiFi and MQTT managers
-    wifi_manager.init(hardware_manager.get_preferences());
-    mqtt_manager.init(hardware_manager.get_preferences());
+    // Initialize WiFi and MQTT managers (TEMPORARILY DISABLED FOR DEBUGGING)
+    // wifi_manager.init(hardware_manager.get_preferences());
+    // mqtt_manager.init(hardware_manager.get_preferences());
 
-    // Link network managers to Bluetooth for BLE provisioning
-    bluetooth_manager.set_network_managers(&wifi_manager, &mqtt_manager);
+    // Link network managers to Bluetooth for BLE provisioning (TEMPORARILY DISABLED)
+    // bluetooth_manager.set_network_managers(&wifi_manager, &mqtt_manager);
 
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
@@ -137,7 +137,7 @@ void setup() {
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller,
                                               &grind_controller, &bluetooth_manager, &ui_manager,
-                                              &wifi_manager, &mqtt_manager);
+                                              nullptr, nullptr);  // WiFi/MQTT temporarily disabled
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
@@ -149,7 +149,7 @@ void setup() {
     LOG_BLE("✅ TaskManager initialized successfully\n");
     
     // Initialize remaining task modules that depend on TaskManager queues
-    file_io_task.init(task_manager.get_file_io_queue(), task_manager.get_network_publish_queue());
+    file_io_task.init(task_manager.get_file_io_queue(), nullptr);  // Network queue disabled
 
     LOG_BLE("✅ All task modules initialized\n");
 }
