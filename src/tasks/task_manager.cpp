@@ -164,9 +164,17 @@ bool TaskManager::create_all_tasks() {
         return false;
     }
 
-    if (!create_network_task()) {
-        LOG_BLE("ERROR: Failed to create network task\n");
-        return false;
+    // Only create network task if WiFi or MQTT is enabled
+    if (wifi_manager && mqtt_manager) {
+        if (wifi_manager->is_enabled() || mqtt_manager->is_enabled()) {
+            if (!create_network_task()) {
+                LOG_BLE("ERROR: Failed to create network task\n");
+                return false;
+            }
+        } else {
+            LOG_BLE("Network Task: Skipped (WiFi and MQTT disabled)\n");
+            task_handles.network_task = nullptr;
+        }
     }
 
     return true;
