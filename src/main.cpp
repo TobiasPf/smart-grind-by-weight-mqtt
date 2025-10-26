@@ -9,8 +9,9 @@
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "bluetooth/manager.h"
-#include "network/wifi_manager.h"
-#include "network/mqtt_manager.h"
+// WiFi/MQTT includes disabled - causes SPI conflicts
+// #include "network/wifi_manager.h"
+// #include "network/mqtt_manager.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -23,8 +24,10 @@ GrindController grind_controller;
 UIManager ui_manager;
 BluetoothManager g_bluetooth_manager;
 BluetoothManager& bluetooth_manager = g_bluetooth_manager;
-WiFiManager wifi_manager;
-MQTTManager mqtt_manager;
+// WiFi/MQTT DISABLED: Even creating these global objects causes SPI conflicts
+// because WiFiClient constructor initializes WiFi hardware during startup
+// WiFiManager wifi_manager;
+// MQTTManager mqtt_manager;
 
 #if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
