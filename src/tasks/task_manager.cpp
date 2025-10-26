@@ -577,7 +577,7 @@ bool TaskManager::create_network_task() {
         nullptr,
         SYS_TASK_PRIORITY_NETWORK,
         &task_handles.network_task,
-        1  // Core 1 (UI core)
+        0  // Core 0 (moved from Core 1 to avoid SPI conflicts with display)
     );
 
     if (result != pdPASS) {
@@ -585,7 +585,7 @@ bool TaskManager::create_network_task() {
         return false;
     }
 
-    LOG_BLE("TaskManager: Network task created (Core 1, Priority %d, %dms interval)\n",
+    LOG_BLE("✅ Network Task created (Core 0, Priority %d, %dms interval)\n",
             SYS_TASK_PRIORITY_NETWORK, SYS_TASK_NETWORK_INTERVAL_MS);
     return true;
 }
