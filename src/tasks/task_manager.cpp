@@ -278,7 +278,7 @@ bool TaskManager::create_file_io_task() {
         nullptr,
         SYS_TASK_PRIORITY_FILE_IO,
         &task_handles.file_io_task,
-        0  // Core 0 (moved from Core 1 to avoid SPI conflicts with display)
+        1  // Core 1 (original configuration - reverted from Core 0)
     );
 
     if (result != pdPASS) {
@@ -286,7 +286,7 @@ bool TaskManager::create_file_io_task() {
         return false;
     }
 
-    LOG_BLE("✅ File I/O Task created (Core 0, Priority %d, %dHz)\n",
+    LOG_BLE("✅ File I/O Task created (Core 1, Priority %d, %dHz)\n",
             SYS_TASK_PRIORITY_FILE_IO, 1000 / SYS_TASK_FILE_IO_INTERVAL_MS);
     return true;
 }
