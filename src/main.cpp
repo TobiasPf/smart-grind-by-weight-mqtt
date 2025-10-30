@@ -9,9 +9,8 @@
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "bluetooth/manager.h"
-// WiFi/MQTT includes disabled - causes SPI conflicts
-// #include "network/wifi_manager.h"
-// #include "network/mqtt_manager.h"
+// WiFi/MQTT using factory pattern to avoid early WiFi library initialization
+#include "network/network_factory.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -24,10 +23,10 @@ GrindController grind_controller;
 UIManager ui_manager;
 BluetoothManager g_bluetooth_manager;
 BluetoothManager& bluetooth_manager = g_bluetooth_manager;
-// WiFi/MQTT DISABLED: Even creating these global objects causes SPI conflicts
-// because WiFiClient constructor initializes WiFi hardware during startup
-// WiFiManager wifi_manager;
-// MQTTManager mqtt_manager;
+// WiFi/MQTT managers created via factory in setup() to avoid early initialization
+// Display now uses SPI3_HOST, WiFi will use SPI2_HOST (see platformio.ini)
+WiFiManager* wifi_manager = nullptr;
+MQTTManager* mqtt_manager = nullptr;
 
 #if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
@@ -83,12 +82,20 @@ void setup() {
     
     bluetooth_manager.init(hardware_manager.get_preferences());
 
-    // Initialize WiFi and MQTT managers (TEMPORARILY DISABLED FOR DEBUGGING)
-    // wifi_manager.init(hardware_manager.get_preferences());
-    // mqtt_manager.init(hardware_manager.get_preferences());
+    // Create WiFi and MQTT managers via factory (avoids early WiFi library initialization)
+    // Display now uses SPI3_HOST, WiFi will use SPI2_HOST - no more SPI conflicts
+    LOG_BLE("[STARTUP] Creating WiFi/MQTT managers via factory...\n");
+    wifi_manager = NetworkFactory::create_wifi_manager();
+    mqtt_manager = NetworkFactory::create_mqtt_manager();
 
-    // Link network managers to Bluetooth for BLE provisioning (TEMPORARILY DISABLED)
-    // bluetooth_manager.set_network_managers(&wifi_manager, &mqtt_manager);
+    if (wifi_manager && mqtt_manager) {
+        wifi_manager->init(hardware_manager.get_preferences());
+        mqtt_manager->init(hardware_manager.get_preferences());
+        bluetooth_manager.set_network_managers(wifi_manager, mqtt_manager);
+        LOG_BLE("✅ WiFi/MQTT managers initialized\n");
+    } else {
+        LOG_BLE("ERROR: Failed to create WiFi/MQTT managers\n");
+    }
 
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
@@ -140,7 +147,7 @@ void setup() {
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller,
                                               &grind_controller, &bluetooth_manager, &ui_manager,
-                                              nullptr, nullptr);  // WiFi/MQTT temporarily disabled
+                                              wifi_manager, mqtt_manager);
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
@@ -152,7 +159,7 @@ void setup() {
     LOG_BLE("✅ TaskManager initialized successfully\n");
     
     // Initialize remaining task modules that depend on TaskManager queues
-    file_io_task.init(task_manager.get_file_io_queue(), nullptr);  // Network queue disabled
+    file_io_task.init(task_manager.get_file_io_queue(), task_manager.get_network_publish_queue());
 
     LOG_BLE("✅ All task modules initialized\n");
 }
