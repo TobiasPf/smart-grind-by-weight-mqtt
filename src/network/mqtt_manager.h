@@ -1,8 +1,10 @@
 #pragma once
 
 #include <Arduino.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
+// WiFi.h NOT included here to prevent early WiFi initialization
+// WiFi headers are only included in mqtt_manager.cpp
+class WiFiClient;  // Forward declaration
+class PubSubClient;  // Forward declaration
 #include <Preferences.h>
 #include <functional>
 #include <queue>
@@ -157,8 +159,8 @@ public:
 
 private:
     Preferences* preferences;
-    WiFiClient wifi_client;
-    PubSubClient mqtt_client;
+    WiFiClient* wifi_client;        // Lazy initialization to avoid early WiFi init
+    PubSubClient* mqtt_client;      // Lazy initialization
     String broker;
     uint16_t port;
     String username;

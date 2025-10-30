@@ -1,8 +1,12 @@
 #include "mqtt_manager.h"
+// WiFi headers ONLY included in .cpp to prevent early initialization
+#include <WiFi.h>
+#include <PubSubClient.h>
 
 MQTTManager::MQTTManager()
     : preferences(nullptr)
-    , mqtt_client(wifi_client)
+    , wifi_client(nullptr)  // Lazy initialization
+    , mqtt_client(nullptr)  // Lazy initialization
     , port(MQTT_DEFAULT_PORT)
     , enabled(false)
     , status(MQTTConnectionStatus::Disabled)
@@ -11,14 +15,22 @@ MQTTManager::MQTTManager()
     , reconnect_attempts(0)
     , status_callback(nullptr)
     , publish_callback(nullptr) {
-
-    // Set MQTT callback (required by PubSubClient, even if we don't subscribe)
-    mqtt_client.setCallback(mqtt_callback);
+    // WiFiClient and PubSubClient created on-demand in enable()
 }
 
 MQTTManager::~MQTTManager() {
     if (enabled) {
         disable();
+    }
+
+    // Clean up lazy-initialized objects
+    if (mqtt_client) {
+        delete mqtt_client;
+        mqtt_client = nullptr;
+    }
+    if (wifi_client) {
+        delete wifi_client;
+        wifi_client = nullptr;
     }
 }
 
@@ -60,6 +72,18 @@ void MQTTManager::enable() {
         return;
     }
 
+    // Lazy initialization: Create WiFiClient and PubSubClient NOW (not at construction)
+    // This prevents WiFi hardware init conflicts during early boot
+    if (!wifi_client) {
+        Serial.println("[MQTT] Creating WiFiClient (lazy init)");
+        wifi_client = new WiFiClient();
+    }
+    if (!mqtt_client) {
+        Serial.println("[MQTT] Creating PubSubClient (lazy init)");
+        mqtt_client = new PubSubClient(*wifi_client);
+        mqtt_client->setCallback(mqtt_callback);
+    }
+
     Serial.println("[MQTT] Enabling...");
     enabled = true;
 
@@ -69,9 +93,9 @@ void MQTTManager::enable() {
     }
 
     // Configure MQTT client
-    mqtt_client.setServer(broker.c_str(), port);
-    mqtt_client.setKeepAlive(MQTT_KEEP_ALIVE_SEC);
-    mqtt_client.setSocketTimeout(MQTT_CONNECTION_TIMEOUT_MS / 1000);
+    mqtt_client->setServer(broker.c_str(), port);
+    mqtt_client->setKeepAlive(MQTT_KEEP_ALIVE_SEC);
+    mqtt_client->setSocketTimeout(MQTT_CONNECTION_TIMEOUT_MS / 1000);
 
     // Reset reconnection state
     reconnect_attempts = 0;
@@ -96,8 +120,8 @@ void MQTTManager::disable() {
     }
 
     // Disconnect from broker
-    if (mqtt_client.connected()) {
-        mqtt_client.disconnect();
+    if (mqtt_client && mqtt_client->connected()) {
+        mqtt_client->disconnect();
     }
 
     update_status(MQTTConnectionStatus::Disabled);
@@ -109,7 +133,7 @@ void MQTTManager::disable() {
 }
 
 void MQTTManager::handle() {
-    if (!enabled) {
+    if (!enabled || !mqtt_client) {
         return;
     }
 
@@ -123,8 +147,8 @@ void MQTTManager::handle() {
     }
 
     // Process MQTT client loop (handle keep-alive, etc.)
-    if (mqtt_client.connected()) {
-        mqtt_client.loop();
+    if (mqtt_client->connected()) {
+        mqtt_client->loop();
     }
 
     // Check connection status
@@ -135,7 +159,7 @@ void MQTTManager::handle() {
 
         case MQTTConnectionStatus::Connecting:
             // Check if connection succeeded or timed out
-            if (mqtt_client.connected()) {
+            if (mqtt_client->connected()) {
                 update_status(MQTTConnectionStatus::Connected);
                 log_status(MQTTConnectionStatus::Connected, broker.c_str());
                 reconnect_attempts = 0;
@@ -152,7 +176,7 @@ void MQTTManager::handle() {
 
         case MQTTConnectionStatus::Connected:
             // Check if connection was lost
-            if (!mqtt_client.connected()) {
+            if (!mqtt_client->connected()) {
                 Serial.println("[MQTT] Connection lost");
                 update_status(MQTTConnectionStatus::Disconnected);
                 reconnect_attempts = 0;
@@ -374,7 +398,7 @@ void MQTTManager::connect() {
     bool connected = false;
     if (username.length() > 0) {
         // Connect with authentication and last will
-        connected = mqtt_client.connect(client_id.c_str(),
+        connected = mqtt_client->connect(client_id.c_str(),
                                        username.c_str(),
                                        password.c_str(),
                                        will_topic,
@@ -383,7 +407,7 @@ void MQTTManager::connect() {
                                        MQTT_WILL_MESSAGE);
     } else {
         // Connect without authentication, with last will
-        connected = mqtt_client.connect(client_id.c_str(),
+        connected = mqtt_client->connect(client_id.c_str(),
                                        will_topic,
                                        MQTT_QOS_LEVEL,
                                        true, // retain will message
@@ -453,18 +477,18 @@ void MQTTManager::process_publish_queue() {
 }
 
 bool MQTTManager::publish(const char* topic, const char* payload, bool retain) {
-    if (!mqtt_client.connected()) {
+    if (!mqtt_client || !mqtt_client->connected()) {
         return false;
     }
 
     // Check buffer size
-    if (strlen(payload) > mqtt_client.getBufferSize()) {
+    if (strlen(payload) > mqtt_client->getBufferSize()) {
         Serial.printf("[MQTT] Error: Payload too large (%d bytes, max %d)\n",
-                     strlen(payload), mqtt_client.getBufferSize());
+                     strlen(payload), mqtt_client->getBufferSize());
         return false;
     }
 
-    return mqtt_client.publish(topic, payload, retain);
+    return mqtt_client->publish(topic, payload, retain);
 }
 
 void MQTTManager::update_status(MQTTConnectionStatus new_status) {
