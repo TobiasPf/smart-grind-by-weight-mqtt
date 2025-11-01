@@ -82,8 +82,10 @@ void setup() {
     
     bluetooth_manager.init(hardware_manager.get_preferences());
 
-    // Create WiFi and MQTT managers via factory (avoids early WiFi library initialization)
-    // Display now uses SPI3_HOST, WiFi will use SPI2_HOST - no more SPI conflicts
+    // WiFi/MQTT TEMPORARILY DISABLED - SPI conflict investigation ongoing
+    // The ESP32QSPI_SPI_HOST=SPI3_HOST build flag may not be respected by Arduino_GFX
+    // Need to verify display library actually uses SPI3 before re-enabling
+    /*
     LOG_BLE("[STARTUP] Creating WiFi/MQTT managers via factory...\n");
     wifi_manager = NetworkFactory::create_wifi_manager();
     mqtt_manager = NetworkFactory::create_mqtt_manager();
@@ -96,6 +98,7 @@ void setup() {
     } else {
         LOG_BLE("ERROR: Failed to create WiFi/MQTT managers\n");
     }
+    */
 
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
@@ -147,7 +150,7 @@ void setup() {
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller,
                                               &grind_controller, &bluetooth_manager, &ui_manager,
-                                              wifi_manager, mqtt_manager);
+                                              nullptr, nullptr);  // WiFi/MQTT disabled during SPI investigation
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
@@ -159,7 +162,7 @@ void setup() {
     LOG_BLE("✅ TaskManager initialized successfully\n");
     
     // Initialize remaining task modules that depend on TaskManager queues
-    file_io_task.init(task_manager.get_file_io_queue(), task_manager.get_network_publish_queue());
+    file_io_task.init(task_manager.get_file_io_queue(), nullptr);  // Network queue disabled
 
     LOG_BLE("✅ All task modules initialized\n");
 }
