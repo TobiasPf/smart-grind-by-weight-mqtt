@@ -1,7 +1,4 @@
 #include "mqtt_manager.h"
-// WiFi headers ONLY included in .cpp to prevent early initialization
-#include <WiFi.h>
-#include <PubSubClient.h>
 
 MQTTManager::MQTTManager()
     : preferences(nullptr)

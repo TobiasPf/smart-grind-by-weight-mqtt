@@ -1,10 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
-// WiFi.h NOT included here to prevent early WiFi initialization
-// WiFi headers are only included in mqtt_manager.cpp
-class WiFiClient;  // Forward declaration
-class PubSubClient;  // Forward declaration
+#include <WiFi.h>
+#include <PubSubClient.h>
 #include <Preferences.h>
 #include <functional>
 #include <queue>
