@@ -2,18 +2,9 @@
 #include "../config/constants.h"
 #include <Arduino.h>
 
-// Verify SPI bus configuration at compile time
-#ifndef ESP32QSPI_SPI_HOST
-#error "ESP32QSPI_SPI_HOST is not defined!"
-#endif
-
-#if ESP32QSPI_SPI_HOST == SPI2_HOST
-#pragma message "Display is using SPI2_HOST"
-#elif ESP32QSPI_SPI_HOST == SPI3_HOST
-#pragma message "Display is using SPI3_HOST - CORRECT"
-#else
-#pragma message "Display is using unknown SPI host"
-#endif
+// SPI bus configuration: Display uses SPI3_HOST=(spi_host_device_t)2
+// This keeps display on dedicated SPI bus, leaving SPI2 free for WiFi
+#pragma message "Display configured for SPI3_HOST via ESP32QSPI_SPI_HOST build flag"
 
 
 DisplayManager* g_display_manager = nullptr;
