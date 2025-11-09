@@ -108,13 +108,22 @@ MQTT Status: Connected
 
 ## Step 4: Update ESP32-S3 Firmware
 
-The ESP32-S3 firmware needs to be updated to use the UART gateway (not yet integrated in this commit).
+**Integration Status: ✅ COMPLETE**
 
-**Next integration steps:**
-1. Add `UARTGateway` instance to `main.cpp`
-2. Initialize UART on GPIO43/44 in `setup()`
-3. Connect to network task for session publishing
-4. Test grind → UART → MQTT flow
+The ESP32-S3 firmware has been updated to use the UART gateway. The following changes were made:
+
+1. ✅ Added `UARTGateway` instance to `main.cpp`
+2. ✅ Initialized UART on GPIO43/44 in `setup()`
+3. ✅ Connected to network task for session publishing
+4. ✅ Enabled automatic session publishing after grind completion
+
+**What happens automatically:**
+- When you complete a grind, the session data is queued
+- Network task sends session via UART to ESP32-C3
+- ESP32-C3 publishes to MQTT broker
+- You can monitor both serial ports to see the flow
+
+**Next step:** Flash updated firmware to ESP32-S3 and test
 
 ## Testing
 
@@ -199,15 +208,22 @@ grinder/A1B2C3D4E5F6/status
 
 1. ✅ ESP32-C3 firmware created
 2. ✅ UART gateway interface created
-3. ⏳ Integrate into ESP32-S3 main firmware
-4. ⏳ Connect to file_io_task for publishing
-5. ⏳ Test end-to-end grind → MQTT flow
+3. ✅ Integrate into ESP32-S3 main firmware
+4. ✅ Connect to file_io_task for publishing
+5. ⏳ Flash ESP32-C3 gateway firmware
+6. ⏳ Configure WiFi/MQTT via serial
+7. ⏳ Flash updated ESP32-S3 firmware
+8. ⏳ Test end-to-end grind → UART → MQTT flow
 
 ---
 
-**Files Created:**
+**Files Created/Modified:**
 - `gateway-esp32c6/` - Complete ESP32-C3 gateway firmware
 - `src/network/uart_gateway.h/cpp` - UART communication interface
+- `src/main.cpp` - Initialize UART gateway and network queue
+- `src/tasks/task_manager.h/cpp` - Replace WiFi/MQTT with UART gateway
 - This setup guide
 
-**Commit:** `aeefdbf` - "Add ESP32-C3 WiFi/MQTT gateway with UART communication"
+**Commits:**
+- `aeefdbf` - "Add ESP32-C3 WiFi/MQTT gateway with UART communication"
+- `6e8c445` - "Integrate UART gateway into ESP32-S3 firmware"
