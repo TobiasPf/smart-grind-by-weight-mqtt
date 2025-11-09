@@ -1,27 +1,27 @@
-# ESP32-C6 SuperMini WiFi/MQTT Gateway
+# ESP32-C3 SuperMini WiFi/MQTT Gateway
 
-Standalone firmware for ESP32-C6 SuperMini that receives grind session data from the main ESP32-S3 coffee scale via UART and publishes to an MQTT broker.
+Standalone firmware for ESP32-C3 SuperMini that receives grind session data from the main ESP32-S3 coffee scale via UART and publishes to an MQTT broker.
 
 ## Purpose
 
-This gateway offloads WiFi/MQTT functionality to a separate ESP32-C6, completely avoiding SPI bus conflicts with the ESP32-S3's display.
+This gateway offloads WiFi/MQTT functionality to a separate ESP32-C3, completely avoiding SPI bus conflicts with the ESP32-S3's display.
 
 ## Hardware Setup
 
 ### Wiring Between Boards
 
 ```
-ESP32-S3 (Coffee Scale)    ESP32-C6 SuperMini (Gateway)
+ESP32-S3 (Coffee Scale)    ESP32-C3 SuperMini (Gateway)
 -----------------------    ----------------------------
-TX (GPIO43)            →   RX (GPIO16)
-RX (GPIO44)            ←   TX (GPIO17)
+TX (GPIO43)            →   RX (GPIO20)
+RX (GPIO44)            ←   TX (GPIO21)
 GND                    —   GND
 ```
 
 ### Power
 
 - ESP32-S3: Powered via USB or battery
-- ESP32-C6: Powered via separate USB connection
+- ESP32-C3: Powered via separate USB-C connection
 
 ## Building and Flashing
 
@@ -32,9 +32,9 @@ platformio run --target upload --upload-port /dev/ttyACM0  # or COM port on Wind
 
 ## Configuration via Serial
 
-Connect to the ESP32-C6 via USB serial at 115200 baud.
+Connect to the ESP32-C3 via USB serial at 115200 baud.
 
-### Configure WiFi
+### Configure WiFi (ESP32-C3)
 
 ```
 wifi ssid=YourNetwork pass=YourPassword
@@ -78,7 +78,7 @@ Clears all settings and restarts.
 
 ## UART Protocol
 
-### ESP32-S3 → ESP32-C6
+### ESP32-S3 → ESP32-C3
 
 **Publish Session:**
 ```json
@@ -98,7 +98,7 @@ Clears all settings and restarts.
 {"cmd":"status"}
 ```
 
-### ESP32-C6 → ESP32-S3
+### ESP32-C3 → ESP32-S3
 
 **Status Response:**
 ```json
@@ -127,7 +127,7 @@ grinder/{device_id}/status
 
 ### WiFi won't connect
 - Check SSID and password spelling
-- Verify 2.4GHz network (ESP32-C6 doesn't support 5GHz)
+- Verify 2.4GHz network (ESP32-C3 doesn't support 5GHz)
 - Check signal strength
 
 ### MQTT won't connect

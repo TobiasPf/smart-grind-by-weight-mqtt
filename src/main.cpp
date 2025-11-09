@@ -9,8 +9,7 @@
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "bluetooth/manager.h"
-// WiFi/MQTT using factory pattern to avoid early WiFi library initialization
-#include "network/network_factory.h"
+#include "network/uart_gateway.h"
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -23,10 +22,9 @@ GrindController grind_controller;
 UIManager ui_manager;
 BluetoothManager g_bluetooth_manager;
 BluetoothManager& bluetooth_manager = g_bluetooth_manager;
-// WiFi/MQTT managers created via factory in setup() to avoid early initialization
-// Display now uses SPI3_HOST, WiFi will use SPI2_HOST (see platformio.ini)
-WiFiManager* wifi_manager = nullptr;
-MQTTManager* mqtt_manager = nullptr;
+// UART gateway for WiFi/MQTT via ESP32-C3 gateway board
+UARTGateway uart_gateway;
+HardwareSerial uart_to_gateway(1); // Serial1 for UART communication
 
 #if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
@@ -82,23 +80,11 @@ void setup() {
     
     bluetooth_manager.init(hardware_manager.get_preferences());
 
-    // WiFi/MQTT TEMPORARILY DISABLED - SPI conflict investigation ongoing
-    // The ESP32QSPI_SPI_HOST=SPI3_HOST build flag may not be respected by Arduino_GFX
-    // Need to verify display library actually uses SPI3 before re-enabling
-    /*
-    LOG_BLE("[STARTUP] Creating WiFi/MQTT managers via factory...\n");
-    wifi_manager = NetworkFactory::create_wifi_manager();
-    mqtt_manager = NetworkFactory::create_mqtt_manager();
-
-    if (wifi_manager && mqtt_manager) {
-        wifi_manager->init(hardware_manager.get_preferences());
-        mqtt_manager->init(hardware_manager.get_preferences());
-        bluetooth_manager.set_network_managers(wifi_manager, mqtt_manager);
-        LOG_BLE("✅ WiFi/MQTT managers initialized\n");
-    } else {
-        LOG_BLE("ERROR: Failed to create WiFi/MQTT managers\n");
-    }
-    */
+    // Initialize UART gateway for WiFi/MQTT via ESP32-C3 gateway board
+    // UART: TX=GPIO43, RX=GPIO44, 115200 baud
+    LOG_BLE("[STARTUP] Initializing UART gateway (ESP32-C3 WiFi/MQTT bridge)...\n");
+    uart_gateway.init(&uart_to_gateway, 44, 43, 115200);  // RX=44, TX=43
+    LOG_BLE("✅ UART gateway initialized (TX=GPIO43, RX=GPIO44, 115200 baud)\n");
 
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
@@ -150,7 +136,7 @@ void setup() {
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller,
                                               &grind_controller, &bluetooth_manager, &ui_manager,
-                                              nullptr, nullptr);  // WiFi/MQTT disabled during SPI investigation
+                                              &uart_gateway);  // UART gateway for WiFi/MQTT via ESP32-C3
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");
@@ -160,9 +146,9 @@ void setup() {
     }
     
     LOG_BLE("✅ TaskManager initialized successfully\n");
-    
+
     // Initialize remaining task modules that depend on TaskManager queues
-    file_io_task.init(task_manager.get_file_io_queue(), nullptr);  // Network queue disabled
+    file_io_task.init(task_manager.get_file_io_queue(), task_manager.get_network_publish_queue());
 
     LOG_BLE("✅ All task modules initialized\n");
 }

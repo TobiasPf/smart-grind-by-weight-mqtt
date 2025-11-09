@@ -1,12 +1,12 @@
 /**
- * ESP32-C6 SuperMini WiFi/MQTT Gateway
+ * ESP32-C3 SuperMini WiFi/MQTT Gateway
  *
  * Receives grind session data from ESP32-S3 via UART and publishes to MQTT broker.
  * Configurable via USB serial connection using simple text commands.
  *
  * Hardware:
- * - ESP32-C6 SuperMini
- * - UART RX on GPIO16, TX on GPIO17 (Serial1)
+ * - ESP32-C3 SuperMini
+ * - UART RX on GPIO20, TX on GPIO21 (Serial1)
  * - USB Serial for configuration (Serial/CDC)
  *
  * Serial Commands:
@@ -23,8 +23,8 @@
 #include <ArduinoJson.h>
 
 // Configuration
-#define UART_RX_PIN 16
-#define UART_TX_PIN 17
+#define UART_RX_PIN 20
+#define UART_TX_PIN 21
 #define UART_BAUD 115200
 #define MQTT_BUFFER_SIZE 2048
 #define RECONNECT_INTERVAL_MS 5000
@@ -64,7 +64,7 @@ void setup() {
     // Initialize USB Serial for configuration
     Serial.begin(115200);
     delay(1000);
-    Serial.println("\n\n=== ESP32-C6 WiFi/MQTT Gateway ===");
+    Serial.println("\n\n=== ESP32-C3 WiFi/MQTT Gateway ===");
     Serial.println("Version: 1.0.0");
     Serial.println("Build: " __DATE__ " " __TIME__);
 

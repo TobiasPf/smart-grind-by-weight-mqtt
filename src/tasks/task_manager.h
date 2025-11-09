@@ -12,8 +12,7 @@ class ProfileController;
 class GrindController;
 class BluetoothManager;
 class UIManager;
-class WiFiManager;
-class MQTTManager;
+class UARTGateway;
 
 // Task handle storage for all FreeRTOS tasks
 struct TaskHandles {
@@ -74,8 +73,7 @@ private:
     GrindController* grind_controller;
     BluetoothManager* bluetooth_manager;
     UIManager* ui_manager;
-    WiFiManager* wifi_manager;
-    MQTTManager* mqtt_manager;
+    UARTGateway* uart_gateway;
 
     // Task monitoring
     TaskMetrics task_metrics[6]; // One for each task
@@ -92,7 +90,7 @@ public:
     // Initialization
     bool init(HardwareManager* hw_mgr, StateMachine* sm, ProfileController* pc,
               GrindController* gc, BluetoothManager* bluetooth, UIManager* ui,
-              WiFiManager* wifi, MQTTManager* mqtt);
+              UARTGateway* gateway = nullptr);
     
     // Task lifecycle management
     bool create_all_tasks();
