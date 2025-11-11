@@ -8,8 +8,7 @@
 #include "../controllers/grind_controller.h"
 #include "../bluetooth/manager.h"
 #include "../ui/ui_manager.h"
-#include "../network/wifi_manager.h"
-#include "../network/mqtt_manager.h"
+#include "../network/uart_gateway.h"
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"
@@ -33,8 +32,7 @@ TaskManager::TaskManager() {
     grind_controller = nullptr;
     bluetooth_manager = nullptr;
     ui_manager = nullptr;
-    wifi_manager = nullptr;
-    mqtt_manager = nullptr;
+    uart_gateway = nullptr;
 
     tasks_initialized = false;
     ota_suspended = false;
@@ -52,15 +50,14 @@ TaskManager::~TaskManager() {
 
 bool TaskManager::init(HardwareManager* hw_mgr, StateMachine* sm, ProfileController* pc,
                       GrindController* gc, BluetoothManager* bluetooth, UIManager* ui,
-                      WiFiManager* wifi, MQTTManager* mqtt) {
+                      UARTGateway* gateway) {
     hardware_manager = hw_mgr;
     state_machine = sm;
     profile_controller = pc;
     grind_controller = gc;
     bluetooth_manager = bluetooth;
     ui_manager = ui;
-    wifi_manager = wifi;
-    mqtt_manager = mqtt;
+    uart_gateway = gateway;
     
     LOG_BLE("TaskManager: Initializing FreeRTOS task architecture...\n");
     
@@ -106,8 +103,8 @@ bool TaskManager::create_inter_task_queues() {
         return false;
     }
 
-    // Network publish queue (only if WiFi or MQTT managers are present)
-    if (wifi_manager || mqtt_manager) {
+    // Network publish queue (only if UART gateway is present)
+    if (uart_gateway) {
         task_queues.network_publish_queue = xQueueCreate(SYS_QUEUE_NETWORK_PUBLISH_SIZE, sizeof(GrindSession));
         if (!task_queues.network_publish_queue) {
             LOG_BLE("ERROR: Failed to create network_publish_queue\n");
@@ -115,7 +112,7 @@ bool TaskManager::create_inter_task_queues() {
         }
     } else {
         task_queues.network_publish_queue = nullptr;
-        LOG_BLE("Network publish queue: Skipped (network managers disabled)\n");
+        LOG_BLE("Network publish queue: Skipped (UART gateway disabled)\n");
     }
 
     LOG_BLE("TaskManager: Inter-task communication queues created successfully\n");
@@ -169,17 +166,15 @@ bool TaskManager::create_all_tasks() {
         return false;
     }
 
-    // Only create network task if WiFi or MQTT is enabled
-    if (wifi_manager && mqtt_manager) {
-        if (wifi_manager->is_enabled() || mqtt_manager->is_enabled()) {
-            if (!create_network_task()) {
-                LOG_BLE("ERROR: Failed to create network task\n");
-                return false;
-            }
-        } else {
-            LOG_BLE("Network Task: Skipped (WiFi and MQTT disabled)\n");
-            task_handles.network_task = nullptr;
+    // Only create network task if UART gateway is present
+    if (uart_gateway) {
+        if (!create_network_task()) {
+            LOG_BLE("ERROR: Failed to create network task\n");
+            return false;
         }
+    } else {
+        LOG_BLE("Network Task: Skipped (UART gateway disabled)\n");
+        task_handles.network_task = nullptr;
     }
 
     return true;
@@ -614,27 +609,27 @@ void TaskManager::network_task_impl() {
     const TickType_t task_period = pdMS_TO_TICKS(SYS_TASK_NETWORK_INTERVAL_MS);
     const int task_index = 5; // Index for network task metrics
 
-    LOG_BLE("Network task started on Core %d\n", xPortGetCoreID());
+    LOG_BLE("Network task started on Core %d (UART Gateway)\n", xPortGetCoreID());
 
     while (true) {
         unsigned long start_time = millis();
 
-        // Handle WiFi connection management
-        if (wifi_manager) {
-            wifi_manager->handle();
-        }
-
-        // Handle MQTT connection and publishes
-        if (mqtt_manager) {
-            mqtt_manager->handle();
+        // Handle UART gateway communication (reads status responses from ESP32-C3)
+        if (uart_gateway) {
+            uart_gateway->handle();
         }
 
         // Process any pending grind sessions from queue
         GrindSession session;
         while (xQueueReceive(task_queues.network_publish_queue, &session, 0) == pdPASS) {
-            // Publish session to MQTT
-            if (mqtt_manager && mqtt_manager->is_enabled()) {
-                mqtt_manager->publish_session(&session);
+            // Publish session via UART to ESP32-C3 gateway
+            if (uart_gateway) {
+                bool success = uart_gateway->publish_session(&session);
+                if (success) {
+                    LOG_BLE("[UART Gateway] Session %lu queued for publishing\n", session.session_id);
+                } else {
+                    LOG_BLE("[UART Gateway] WARNING: Failed to send session %lu\n", session.session_id);
+                }
             }
         }
 
