@@ -22,6 +22,11 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 
+// For ESP32-C3 USB CDC Serial
+#if ARDUINO_USB_CDC_ON_BOOT
+#include "USB.h"
+#endif
+
 // Configuration
 #define UART_RX_PIN 20
 #define UART_TX_PIN 21
@@ -62,8 +67,19 @@ void printStatus();
 
 void setup() {
     // Initialize USB Serial for configuration
+#if ARDUINO_USB_CDC_ON_BOOT
+    // USB CDC is automatically started, just wait for it
     Serial.begin(115200);
-    delay(1000);
+    // Wait for USB Serial to be ready (optional, for debugging)
+    unsigned long start = millis();
+    while (!Serial && (millis() - start < 3000)) {
+        delay(10);
+    }
+#else
+    Serial.begin(115200);
+#endif
+
+    delay(500);
     Serial.println("\n\n=== ESP32-C3 WiFi/MQTT Gateway ===");
     Serial.println("Version: 1.0.0");
     Serial.println("Build: " __DATE__ " " __TIME__);
@@ -339,10 +355,10 @@ void handleUartData() {
 
     if (cmd == "pub") {
         // Publish grind session to MQTT
-        if (mqttConnected && doc.containsKey("data")) {
+        if (mqttConnected && doc["data"].is<JsonObject>()) {
             publishSession(doc["data"]);
         } else {
-            Serial.println("[MQTT] Not connected, cannot publish");
+            Serial.println("[MQTT] Not connected or invalid data, cannot publish");
         }
     } else if (cmd == "status") {
         // Send status back to ESP32-S3
