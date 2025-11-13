@@ -579,6 +579,7 @@ void TaskManager::print_task_status() const {
     LOG_BLE("========================\n");
 }
 
+#if ENABLE_UART_GATEWAY
 bool TaskManager::create_network_task() {
     BaseType_t result = xTaskCreatePinnedToCore(
         network_task_wrapper,
@@ -599,7 +600,9 @@ bool TaskManager::create_network_task() {
             SYS_TASK_PRIORITY_NETWORK, SYS_TASK_NETWORK_INTERVAL_MS);
     return true;
 }
+#endif
 
+#if ENABLE_UART_GATEWAY
 void TaskManager::network_task_wrapper(void* parameter) {
     if (instance) {
         instance->network_task_impl();
@@ -651,3 +654,4 @@ void TaskManager::network_task_impl() {
         vTaskDelayUntil(&last_wake_time, task_period);
     }
 }
+#endif

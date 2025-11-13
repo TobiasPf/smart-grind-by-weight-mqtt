@@ -113,8 +113,10 @@ public:
     static void ui_render_task_wrapper(void* parameter);
     static void bluetooth_task_wrapper(void* parameter);
     static void file_io_task_wrapper(void* parameter);
+#if ENABLE_UART_GATEWAY
     static void network_task_wrapper(void* parameter);
-    
+#endif
+
 private:
     // Task creation helpers
     bool create_weight_sampling_task();
@@ -122,8 +124,10 @@ private:
     bool create_ui_render_task();
     bool create_bluetooth_task();
     bool create_file_io_task();
+#if ENABLE_UART_GATEWAY
     bool create_network_task();
-    
+#endif
+
     // Queue creation
     bool create_inter_task_queues();
     void cleanup_queues();
@@ -134,8 +138,10 @@ private:
     void ui_render_task_impl();
     void bluetooth_task_impl();
     void file_io_task_impl();
+#if ENABLE_UART_GATEWAY
     void network_task_impl();
-    
+#endif
+
     // Performance monitoring
     void record_task_timing(int task_index, uint32_t start_time, uint32_t end_time);
     void print_task_heartbeat(int task_index, const char* task_name) const;
