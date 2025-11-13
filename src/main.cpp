@@ -9,7 +9,9 @@
 #include "ui/ui_manager.h"
 #include "config/constants.h"
 #include "bluetooth/manager.h"
+#if ENABLE_UART_GATEWAY
 #include "network/uart_gateway.h"
+#endif
 #include "tasks/task_manager.h"
 #include "tasks/weight_sampling_task.h"
 #include "tasks/grind_control_task.h"
@@ -22,9 +24,12 @@ GrindController grind_controller;
 UIManager ui_manager;
 BluetoothManager g_bluetooth_manager;
 BluetoothManager& bluetooth_manager = g_bluetooth_manager;
+
+#if ENABLE_UART_GATEWAY
 // UART gateway for WiFi/MQTT via ESP32-C3 gateway board
 UARTGateway uart_gateway;
 HardwareSerial uart_to_gateway(1); // Serial1 for UART communication
+#endif
 
 #if SYS_ENABLE_REALTIME_HEARTBEAT
 // Core 1 timing metrics (global scope for main loop access)
@@ -80,11 +85,15 @@ void setup() {
     
     bluetooth_manager.init(hardware_manager.get_preferences());
 
+#if ENABLE_UART_GATEWAY
     // Initialize UART gateway for WiFi/MQTT via ESP32-C3 gateway board
     // UART: TX=GPIO43, RX=GPIO44, 115200 baud
     LOG_BLE("[STARTUP] Initializing UART gateway (ESP32-C3 WiFi/MQTT bridge)...\n");
     uart_gateway.init(&uart_to_gateway, 44, 43, 115200);  // RX=44, TX=43
     LOG_BLE("✅ UART gateway initialized (TX=GPIO43, RX=GPIO44, 115200 baud)\n");
+#else
+    LOG_BLE("[STARTUP] UART gateway disabled (standalone mode)\n");
+#endif
 
     // Check for OTA failure to determine initial state
     String failed_ota_build = bluetooth_manager.check_ota_failure_after_boot();
@@ -135,8 +144,13 @@ void setup() {
     // Initialize TaskManager with hardware and system interfaces
     LOG_BLE("[STARTUP] Initializing FreeRTOS Task Architecture...\n");
     bool task_init_success = task_manager.init(&hardware_manager, &state_machine, &profile_controller,
-                                              &grind_controller, &bluetooth_manager, &ui_manager,
-                                              &uart_gateway);  // UART gateway for WiFi/MQTT via ESP32-C3
+                                              &grind_controller, &bluetooth_manager, &ui_manager
+#if ENABLE_UART_GATEWAY
+                                              , &uart_gateway  // UART gateway for WiFi/MQTT via ESP32-C3
+#else
+                                              , nullptr  // No UART gateway in standalone mode
+#endif
+                                              );
     
     if (!task_init_success) {
         LOG_BLE("ERROR: Failed to initialize TaskManager - system cannot start\n");

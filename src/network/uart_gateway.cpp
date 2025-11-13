@@ -12,6 +12,11 @@ UARTGateway::UARTGateway()
 }
 
 void UARTGateway::init(HardwareSerial* serial, int rx_pin, int tx_pin, unsigned long baud) {
+    if (!serial) {
+        Serial.println("[UART Gateway] ERROR: Null serial pointer provided");
+        return;
+    }
+
     uart = serial;
     uart->begin(baud, SERIAL_8N1, rx_pin, tx_pin);
     initialized = true;
@@ -60,7 +65,7 @@ bool UARTGateway::publish_session(const GrindSession* session) {
 }
 
 void UARTGateway::request_status() {
-    if (!initialized) return;
+    if (!initialized || !uart) return;
 
     JsonDocument doc;
     doc["cmd"] = "status";
@@ -70,7 +75,7 @@ void UARTGateway::request_status() {
 }
 
 void UARTGateway::handle() {
-    if (!initialized) return;
+    if (!initialized || !uart) return;
 
     // Read incoming data
     while (uart->available()) {
@@ -135,7 +140,7 @@ void UARTGateway::parse_response(const String& json) {
 }
 
 bool UARTGateway::send_command(const JsonDocument& doc) {
-    if (!initialized) return false;
+    if (!initialized || !uart) return false;
 
     String json;
     serializeJson(doc, json);

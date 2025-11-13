@@ -8,7 +8,9 @@
 #include "../controllers/grind_controller.h"
 #include "../bluetooth/manager.h"
 #include "../ui/ui_manager.h"
+#if ENABLE_UART_GATEWAY
 #include "../network/uart_gateway.h"
+#endif
 #include "../hardware/WeightSensor.h"
 #include "../hardware/grinder.h"
 #include "../logging/grind_logging.h"

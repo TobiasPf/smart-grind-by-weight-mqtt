@@ -8,6 +8,13 @@
 // session data to an MQTT broker.
 
 //------------------------------------------------------------------------------
+// UART GATEWAY ENABLE/DISABLE
+//------------------------------------------------------------------------------
+// Set to 1 to enable UART gateway (requires ESP32-C3 gateway board)
+// Set to 0 to disable network features completely (standalone operation)
+#define ENABLE_UART_GATEWAY 0
+
+//------------------------------------------------------------------------------
 // WIFI CONFIGURATION
 //------------------------------------------------------------------------------
 #define WIFI_MAX_SSID_LENGTH 32                                            // Maximum SSID length
