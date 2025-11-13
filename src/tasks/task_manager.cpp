@@ -168,6 +168,7 @@ bool TaskManager::create_all_tasks() {
         return false;
     }
 
+#if ENABLE_UART_GATEWAY
     // Only create network task if UART gateway is present
     if (uart_gateway) {
         if (!create_network_task()) {
@@ -178,6 +179,10 @@ bool TaskManager::create_all_tasks() {
         LOG_BLE("Network Task: Skipped (UART gateway disabled)\n");
         task_handles.network_task = nullptr;
     }
+#else
+    LOG_BLE("Network Task: Skipped (UART gateway disabled at compile time)\n");
+    task_handles.network_task = nullptr;
+#endif
 
     return true;
 }
