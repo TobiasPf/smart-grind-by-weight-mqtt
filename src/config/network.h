@@ -12,7 +12,7 @@
 //------------------------------------------------------------------------------
 // Set to 1 to enable UART gateway (requires ESP32-C3 gateway board)
 // Set to 0 to disable network features completely (standalone operation)
-#define ENABLE_UART_GATEWAY 0
+#define ENABLE_UART_GATEWAY 1
 
 //------------------------------------------------------------------------------
 // WIFI CONFIGURATION
